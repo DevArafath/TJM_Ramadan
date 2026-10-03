@@ -1,9 +1,9 @@
-const CACHE = 'tjm-ramadan-v1';
+const CACHE = 'tjm-ramadan-v2';
 const SHELL = ['./', 'index.html', 'manifest.json', 'css/style.css', 'js/app.js',
   'images/logo.png', 'images/icon-192.png', 'images/icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()

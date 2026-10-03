@@ -12,6 +12,21 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
   <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
   <link href="css/style.css" rel="stylesheet">
+<script>
+/* Page navigation - runs on its own so pages open even if a library fails to load */
+(function(){
+  function show(){
+    var v=(location.hash||'#home').slice(1);
+    var el=document.getElementById('view-'+v)||document.getElementById('view-home');
+    var all=document.querySelectorAll('.view');
+    for(var i=0;i<all.length;i++)all[i].classList.add('d-none');
+    el.classList.remove('d-none');window.scrollTo(0,0);
+  }
+  window.addEventListener('hashchange',show);
+  document.addEventListener('DOMContentLoaded',show);
+  window.addEventListener('error',function(e){console.error('App error:',e.message,e.filename,e.lineno);});
+})();
+</script>
 </head>
 <body>
 <header class="app-header">

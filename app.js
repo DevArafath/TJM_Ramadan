@@ -1,4 +1,5 @@
 (() => {
+  if (!window.Swal) window.Swal = { fire: (t, m) => { alert((typeof t === 'object' ? t.title : t) + (m ? '\n' + m : '')); return Promise.resolve({ isConfirmed: confirm('Continue?') }); } };
   const KEY = 'tjm_members';
   const $ = s => document.querySelector(s);
   let members = [], scanner = null, scanning = false, busy = false, editing = null, showAll = false, table = null;
@@ -26,6 +27,7 @@
   async function startScanner() {
     if (scanning || busy) return;
     try {
+      if (!window.Html5Qrcode) throw new Error('scanner library not loaded');
       scanner = scanner || new Html5Qrcode('reader');
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 230, height: 230 } }, onScan, () => {});
       scanning = true; updateToggle();
@@ -65,7 +67,7 @@
     openModal(m, null);
   }
 
-  const modal = new bootstrap.Modal('#countModal');
+  let _modal; const modal = { show(){ (_modal = _modal || new bootstrap.Modal($('#countModal'))).show(); }, hide(){ if(_modal) _modal.hide(); }, _m:null };
   const grid = $('#countGrid');
   for (let i = 1; i <= 12; i++) {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = i; b.dataset.n = i; grid.appendChild(b);
@@ -98,7 +100,7 @@
       <td><span class="badge bg-success">${r.count}</span></td><td>${fmt(r.time)}</td>
       <td><button class="act-btn edit" data-id="${esc(r.id)}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
       <button class="act-btn del" data-id="${esc(r.id)}" title="Delete"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-    table = new DataTable('#recTable', { order: [], pageLength: 10, columnDefs: [{ orderable: false, targets: 5 }] });
+    if (window.jQuery && jQuery.fn.DataTable) table = jQuery('#recTable').DataTable({ order: [], pageLength: 10, columnDefs: [{ orderable: false, targets: 5 }] });
     const t = $('#toggleAll');
     t.style.display = data.length > 25 ? '' : 'none';
     t.textContent = showAll ? 'Show recent 25 only' : `Show all ${data.length} records`;
@@ -121,6 +123,7 @@
     const ws = XLSX.utils.json_to_sheet(data.map((r, i) => ({
       '#': i + 1, 'Membership No': r.id, 'Name': r.name, 'Family Members': r.count, 'Scanned At': fmt(r.time) })));
     ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 36 }, { wch: 15 }, { wch: 22 }];
+    if (!window.XLSX) return Swal.fire('Error', 'Excel library not loaded. Check your internet connection.', 'error');
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Members');
     XLSX.writeFile(wb, `TJM_Ramadan_${new Date().toISOString().slice(0, 10)}.xlsx`);
   });
@@ -141,5 +144,6 @@
   $('#installBtn').addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $('#installBtn').classList.add('d-none'); });
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js'));
 
-  loadMaster().then(route);
+  route();
+  loadMaster();
 })();

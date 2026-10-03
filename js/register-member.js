@@ -6,6 +6,7 @@ let editingRecordId = null;
 let modalInstance = null;
 let dataTable = null;
 let scanProcessing = false;
+let scanProcessing = false;
 
 const $ = id => document.getElementById(id);
 
@@ -18,7 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     masterMembers = await TJM.getMembers();
     if (!masterMembers.length) throw new Error("No members");
-    startScanner();
+    setCameraStatus("Camera is ready. Tap Start Camera to begin.");
   } catch (error) {
     Swal.fire({
       icon: "warning",
@@ -29,6 +30,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function bindEvents() {
+  $("startCameraBtn").addEventListener("click", startScanner);
+  $("stopCameraBtn").addEventListener("click", stopScanner);
   $("manualSearch").addEventListener("click", () => handleMemberId($("manualId").value));
   $("manualId").addEventListener("keydown", e => {
     if (e.key === "Enter") handleMemberId(e.target.value);
@@ -61,43 +64,43 @@ function buildCountButtons() {
 }
 
 async function startScanner() {
-  if (scannerRunning || !window.Html5Qrcode) return;
-
+  if (scannerRunning) return;
+  if (!window.Html5Qrcode) { setCameraStatus("QR scanner library could not be loaded.", true); return; }
   scanner = scanner || new Html5Qrcode("reader");
-
+  setCameraStatus("Requesting camera permission...");
+  $("startCameraBtn").disabled = true;
   try {
-    await scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1
-      },
-      decodedText => {
-        handleMemberId(decodedText);
-      },
-      () => {}
-    );
+    await scanner.start({ facingMode: { exact: "environment" } }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 }, decodedText => handleMemberId(decodedText), () => {});
     scannerRunning = true;
+    $("scannerPlaceholder").classList.add("d-none");
+    $("startCameraBtn").disabled = true; $("stopCameraBtn").disabled = false;
+    setCameraStatus("Camera active. Point the camera at the membership QR code.");
   } catch (error) {
     console.warn("Camera scanner could not start:", error);
-    scannerRunning = false;
+    try {
+      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 }, decodedText => handleMemberId(decodedText), () => {});
+      scannerRunning = true; $("scannerPlaceholder").classList.add("d-none");
+      $("startCameraBtn").disabled = true; $("stopCameraBtn").disabled = false;
+      setCameraStatus("Camera active. Point the camera at the membership QR code.");
+    } catch (fallbackError) {
+      console.error("Camera start failed:", fallbackError);
+      $("startCameraBtn").disabled = false; $("stopCameraBtn").disabled = true; $("scannerPlaceholder").classList.remove("d-none");
+      const message = location.protocol !== "https:" && location.hostname !== "localhost" ? "Camera access requires HTTPS. Open the GitHub Pages HTTPS address." : "Camera permission was denied or the camera could not be opened.";
+      setCameraStatus(message, true);
+      await Swal.fire({ icon: "warning", title: "Camera Could Not Start", html: `<p>${escapeHtml(message)}</p><div class="small text-secondary">On Android, allow camera permission for this site and try again.</div>`, confirmButtonColor: "#0f5132" });
+    }
   }
 }
 
 async function stopScanner() {
-  if (!scanner || !scannerRunning) return;
-  try {
-    await scanner.stop();
-    scannerRunning = false;
-  } catch (error) {
-    console.warn("Scanner stop error:", error);
-  }
+  if (!scanner || !scannerRunning) { $("startCameraBtn").disabled = false; $("stopCameraBtn").disabled = true; setCameraStatus("Camera is not active."); return; }
+  try { await scanner.stop(); } catch (error) { console.warn("Scanner stop error:", error); }
+  scannerRunning = false; $("startCameraBtn").disabled = false; $("stopCameraBtn").disabled = true; $("scannerPlaceholder").classList.remove("d-none"); setCameraStatus("Camera stopped.");
 }
 
-async function restartScanner() {
-  if (!scannerRunning) await startScanner();
-}
+async function restartScanner() { if (!scannerRunning) await startScanner(); }
+
+function setCameraStatus(message, error = false) { const el=$("cameraStatus"); if(!el)return; el.textContent=message; el.className=`small text-center mb-3 ${error ? "text-danger fw-semibold" : "text-secondary"}`; }
 
 async function handleMemberId(rawId) {
   const id = String(rawId || "").trim();

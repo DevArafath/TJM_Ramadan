@@ -462,7 +462,7 @@ function processIssueMemberId(memberId, shouldRestartScanner = true) {
   // 1. Check Duplicate Issue
   const alreadyIssued = savedIssuedPorridge.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (alreadyIssued) {
-    playSound('scan_duplicate.mp3');
+    playSound('already_issued.mp3');
     Swal.fire({
       icon: 'warning',
       title: 'Porridge Already Issued!',
@@ -483,7 +483,7 @@ function processIssueMemberId(memberId, shouldRestartScanner = true) {
   // 2. Fetch from registered.json
   const registeredMember = registeredMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!registeredMember) {
-    playSound('scan_warning.mp3');
+    playSound('not_registered.mp3');
     Swal.fire({
       icon: 'error',
       title: 'Not Pre-Registered',

@@ -1,31 +1,41 @@
-// Global State Variables
+// Global Variables
 let masterMembers = [];
+let registeredMembers = []; // Loaded from registered.json
+
 let savedRegistrations = [];
-let html5QrcodeScanner = null;
-let isScannerActive = false;
+let savedIssuedPorridge = [];
+
+let regScanner = null;
+let issueScanner = null;
+
+let isRegScannerActive = false;
+let isIssueScannerActive = false;
+
 let currentEditingMember = null;
-let showAllRecords = false;
-let dataTableInstance = null;
+let showAllRegRecords = false;
+let showAllIssueRecords = false;
+
 let deferredPwaPrompt = null;
 
-const STORAGE_KEY = 'tjm_ramadan_registrations';
+const REG_STORAGE_KEY = 'tjm_ramadan_registrations';
+const ISSUE_STORAGE_KEY = 'tjm_ramadan_porridge_issued';
 
-// Initialize App
+// Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   registerServiceWorker();
-  await loadMasterMembers();
-  loadSavedRegistrations();
+  await loadMasterData();
+  loadLocalStorageData();
   initFamilyCountButtons();
-  initDataTable();
-  renderSavedTable();
+  renderRegTable();
+  renderIssueTable();
 });
 
-// PWA Service Worker Registration
+// Service Worker Registration
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js')
       .then(() => console.log('Service Worker Registered'))
-      .catch((err) => console.error('SW Registration Error:', err));
+      .catch((err) => console.error('SW Error:', err));
   }
 }
 
@@ -46,114 +56,118 @@ function triggerPwaInstall() {
   }
 }
 
-// Fetch Master Members JSON Data
-async function loadMasterMembers() {
+// Fetch master_members.json & registered.json
+async function loadMasterData() {
   try {
-    const response = await fetch('./master_members.json');
-    if (!response.ok) throw new Error('Network response was not ok');
-    masterMembers = await response.json();
+    const [resMaster, resReg] = await Promise.all([
+      fetch('./master_members.json').catch(() => null),
+      fetch('./registered.json').catch(() => null)
+    ]);
+
+    if (resMaster && resMaster.ok) {
+      masterMembers = await resMaster.json();
+    }
+    if (resReg && resReg.ok) {
+      registeredMembers = await resReg.json();
+    }
   } catch (error) {
-    console.error('Failed to load master members:', error);
-    Swal.fire({
-      icon: 'error',
-      title: 'Data Load Error',
-      text: 'Could not load master_members.json file.'
-    });
+    console.error('Error loading JSON data files:', error);
   }
 }
 
-// Local Storage Management
-function loadSavedRegistrations() {
-  const data = localStorage.getItem(STORAGE_KEY);
-  savedRegistrations = data ? JSON.parse(data) : [];
+function loadLocalStorageData() {
+  const regData = localStorage.getItem(REG_STORAGE_KEY);
+  savedRegistrations = regData ? JSON.parse(regData) : [];
+
+  const issueData = localStorage.getItem(ISSUE_STORAGE_KEY);
+  savedIssuedPorridge = issueData ? JSON.parse(issueData) : [];
 }
 
-function saveRegistrationsToStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRegistrations));
-  document.getElementById('totalSavedCount').textContent = `${savedRegistrations.length} Records Saved`;
-}
-
-// Audio Playback Helper
+// Sound Helper
 function playSound(soundFileName) {
-  const audio = new Audio(`sounds/${soundFileName}`);
-  audio.play().catch((err) => console.log('Audio playback prevented/failed:', err));
+  // Clamp number audio to 1-12 if numeric count > 12
+  let targetSound = soundFileName;
+  if (!isNaN(soundFileName)) {
+    let countNum = parseInt(soundFileName, 10);
+    if (countNum > 12) countNum = 12;
+    if (countNum < 1) countNum = 1;
+    targetSound = `${countNum}.mp3`;
+  }
+
+  const audio = new Audio(`sounds/${targetSound}`);
+  audio.play().catch((err) => console.log('Audio playback prevented:', err));
 }
 
 // View Switches
 function showRegistrationView() {
-  document.getElementById('registrationView').style.display = 'block';
   document.getElementById('dashboardSection').style.display = 'none';
-  startScanner();
+  document.getElementById('issuePorridgeView').style.display = 'none';
+  document.getElementById('registrationView').style.display = 'block';
+  stopIssueScanner();
+  startRegScanner();
+}
+
+function showIssuePorridgeView() {
+  document.getElementById('dashboardSection').style.display = 'none';
+  document.getElementById('registrationView').style.display = 'none';
+  document.getElementById('issuePorridgeView').style.display = 'block';
+  stopRegScanner();
+  startIssueScanner();
 }
 
 function showDashboardView() {
   document.getElementById('registrationView').style.display = 'none';
+  document.getElementById('issuePorridgeView').style.display = 'none';
   document.getElementById('dashboardSection').style.display = 'flex';
-  stopScanner();
+  stopRegScanner();
+  stopIssueScanner();
 }
 
-function swalPorridgeInfo() {
-  Swal.fire({
-    title: 'Issue Porridge',
-    text: 'Porridge distribution tracking module is active.',
-    icon: 'info'
-  });
-}
+/* ==========================================================================
+   1. REGISTRATION MODULE SCANNERS & HANDLERS
+   ========================================================================== */
 
-// Scanner Operations using html5-qrcode
-function startScanner() {
-  if (isScannerActive) return;
+function startRegScanner() {
+  if (isRegScannerActive) return;
 
-  html5QrcodeScanner = new Html5Qrcode("qr-reader");
+  regScanner = new Html5Qrcode("qr-reader");
   const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-  html5QrcodeScanner.start(
+  regScanner.start(
     { facingMode: "environment" },
     config,
-    onScanSuccess
+    (decodedText) => {
+      stopRegScanner();
+      processRegMemberId(decodedText.trim());
+    }
   ).then(() => {
-    isScannerActive = true;
-    updateScannerBtnUI(true);
-  }).catch((err) => {
-    console.warn("Unable to start scanner automatically:", err);
-    isScannerActive = false;
-    updateScannerBtnUI(false);
+    isRegScannerActive = true;
+    updateRegScannerBtnUI(true);
+  }).catch(() => {
+    isRegScannerActive = false;
+    updateRegScannerBtnUI(false);
   });
 }
 
-function stopScanner() {
-  if (html5QrcodeScanner && isScannerActive) {
-    html5QrcodeScanner.stop().then(() => {
-      isScannerActive = false;
-      updateScannerBtnUI(false);
-    }).catch(err => console.error("Error stopping scanner:", err));
+function stopRegScanner() {
+  if (regScanner && isRegScannerActive) {
+    regScanner.stop().then(() => {
+      isRegScannerActive = false;
+      updateRegScannerBtnUI(false);
+    }).catch(err => console.error("Reg scanner stop error:", err));
   }
 }
 
-function toggleCamera() {
-  if (isScannerActive) {
-    stopScanner();
-  } else {
-    startScanner();
-  }
+function toggleRegCamera() {
+  if (isRegScannerActive) stopRegScanner();
+  else startRegScanner();
 }
 
-function updateScannerBtnUI(active) {
-  const btn = document.getElementById('toggleCameraBtn');
+function updateRegScannerBtnUI(active) {
+  const btn = document.getElementById('toggleRegCameraBtn');
   if (!btn) return;
-  if (active) {
-    btn.innerHTML = `<i class="fa-solid fa-pause me-1"></i> Pause Scanner`;
-    btn.className = "btn btn-outline-warning btn-sm rounded-pill";
-  } else {
-    btn.innerHTML = `<i class="fa-solid fa-play me-1"></i> Start Scanner`;
-    btn.className = "btn btn-outline-primary btn-sm rounded-pill";
-  }
-}
-
-// Scanning and Validation Handler
-function onScanSuccess(decodedText) {
-  stopScanner(); // Pause scanner immediately after detection
-  processMemberId(decodedText.trim());
+  btn.innerHTML = active ? `<i class="fa-solid fa-pause me-1"></i> Pause Scanner` : `<i class="fa-solid fa-play me-1"></i> Start Scanner`;
+  btn.className = active ? "btn btn-outline-warning btn-sm rounded-pill" : "btn btn-outline-primary btn-sm rounded-pill";
 }
 
 function handleManualSubmit() {
@@ -163,19 +177,18 @@ function handleManualSubmit() {
     Swal.fire('Warning', 'Please enter a valid Membership ID', 'warning');
     return;
   }
-  stopScanner();
-  processMemberId(val);
+  stopRegScanner();
+  processRegMemberId(val);
   input.value = '';
 }
 
-function processMemberId(memberId) {
-  // Check Duplicate Registration
+function processRegMemberId(memberId) {
   const existingRecord = savedRegistrations.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (existingRecord) {
     playSound('scan_duplicate.mp3');
     Swal.fire({
       icon: 'warning',
-      title: 'Already Scanned Card!',
+      title: 'Already Registered Card!',
       html: `
         <div class="text-start">
           <p><strong>ID:</strong> ${existingRecord.id}</p>
@@ -183,35 +196,26 @@ function processMemberId(memberId) {
           <p><strong>Family Count:</strong> ${existingRecord.familyCount}</p>
           <p><strong>Scanned At:</strong> ${existingRecord.timestamp}</p>
         </div>
-      `,
-      confirmButtonText: 'OK'
-    }).then(() => {
-      startScanner();
-    });
+      `
+    }).then(() => startRegScanner());
     return;
   }
 
-  // Lookup in Master JSON
   const matchedMember = masterMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!matchedMember) {
     playSound('scan_warning.mp3');
     Swal.fire({
       icon: 'error',
       title: 'Member Not Found',
-      text: `No master record found matching ID: ${memberId}`,
-      confirmButtonText: 'Try Again'
-    }).then(() => {
-      startScanner();
-    });
+      text: `No master record found matching ID: ${memberId}`
+    }).then(() => startRegScanner());
     return;
   }
 
-  // Member Found - Open Family Selection Modal
   currentEditingMember = { ...matchedMember, isEditMode: false };
   openMemberModal(matchedMember.id, matchedMember.name);
 }
 
-// Modal Actions & Family Count Grid
 function initFamilyCountButtons() {
   const container = document.getElementById('familyCountButtons');
   container.innerHTML = '';
@@ -220,9 +224,7 @@ function initFamilyCountButtons() {
     col.className = 'col-3 col-sm-2';
     col.innerHTML = `
       <button class="btn btn-outline-primary badge-count w-100 d-flex align-items-center justify-content-center" 
-              onclick="selectFamilyCount(${i})">
-        ${i}
-      </button>
+              onclick="selectFamilyCount(${i})">${i}</button>
     `;
     container.appendChild(col);
   }
@@ -239,7 +241,7 @@ function closeMemberModal() {
   const modalEl = bootstrap.Modal.getInstance(document.getElementById('memberModal'));
   if (modalEl) modalEl.hide();
   currentEditingMember = null;
-  startScanner();
+  startRegScanner();
 }
 
 function selectFamilyCount(count) {
@@ -249,14 +251,12 @@ function selectFamilyCount(count) {
   const timestampStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
 
   if (currentEditingMember.isEditMode) {
-    // Update existing record
     const idx = savedRegistrations.findIndex(r => r.id === currentEditingMember.id);
     if (idx !== -1) {
       savedRegistrations[idx].familyCount = count;
       savedRegistrations[idx].timestamp = timestampStr;
     }
   } else {
-    // Add new record
     savedRegistrations.unshift({
       id: currentEditingMember.id,
       name: currentEditingMember.name,
@@ -265,35 +265,21 @@ function selectFamilyCount(count) {
     });
   }
 
-  saveRegistrationsToStorage();
-  renderSavedTable();
+  localStorage.setItem(REG_STORAGE_KEY, JSON.stringify(savedRegistrations));
+  renderRegTable();
 
   const modalEl = bootstrap.Modal.getInstance(document.getElementById('memberModal'));
   if (modalEl) modalEl.hide();
 
   currentEditingMember = null;
-  startScanner();
+  startRegScanner();
 }
 
-// Datatable Initialization & Render Functions
-function initDataTable() {
-  if ($.fn.DataTable.isDataTable('#membersTable')) {
-    $('#membersTable').DataTable().destroy();
-  }
-  dataTableInstance = $('#membersTable').DataTable({
-    responsive: true,
-    paging: false,
-    info: false,
-    searching: true,
-    order: []
-  });
-}
-
-function renderSavedTable() {
+function renderRegTable() {
   const tbody = document.getElementById('membersTableBody');
   tbody.innerHTML = '';
 
-  const displayList = showAllRecords ? savedRegistrations : savedRegistrations.slice(0, 25);
+  const displayList = showAllRegRecords ? savedRegistrations : savedRegistrations.slice(0, 25);
 
   displayList.forEach((item) => {
     const tr = document.createElement('tr');
@@ -303,12 +289,8 @@ function renderSavedTable() {
       <td class="text-center"><span class="badge bg-primary rounded-pill px-3 py-2">${item.familyCount}</span></td>
       <td><small class="text-muted">${item.timestamp}</small></td>
       <td class="text-end">
-        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editRecord('${item.id}')" title="Edit">
-          <i class="fa-solid fa-pen-to-square"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${item.id}')" title="Delete">
-          <i class="fa-solid fa-trash"></i>
-        </button>
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="editRegRecord('${item.id}')" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteRegRecord('${item.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -318,20 +300,13 @@ function renderSavedTable() {
 }
 
 function toggleRecordViewLimit() {
-  showAllRecords = !showAllRecords;
-  const subtitle = document.getElementById('tableSubtitle');
-
-  if (showAllRecords) {
-    subtitle.textContent = `Displaying all ${savedRegistrations.length} records`;
-  } else {
-    subtitle.textContent = `Displaying recent 25 records`;
-  }
-  renderSavedTable();
+  showAllRegRecords = !showAllRegRecords;
+  document.getElementById('regTableSubtitle').textContent = showAllRegRecords ? `Displaying all ${savedRegistrations.length} records` : `Displaying recent 25 records`;
+  renderRegTable();
 }
 
-// Record Action Handlers (Edit & Delete)
-function editRecord(id) {
-  stopScanner();
+function editRegRecord(id) {
+  stopRegScanner();
   const record = savedRegistrations.find(r => r.id === id);
   if (!record) return;
 
@@ -339,24 +314,23 @@ function editRecord(id) {
   openMemberModal(record.id, record.name);
 }
 
-function deleteRecord(id) {
+function deleteRegRecord(id) {
   const record = savedRegistrations.find(r => r.id === id);
   if (!record) return;
 
   Swal.fire({
     title: 'Confirm Deletion',
-    html: `Are you sure you want to delete this record?<br><br><strong>ID:</strong> ${record.id}<br><strong>Name:</strong> ${record.name}`,
+    html: `Delete registration for ID: <strong>${record.id}</strong>?`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#dc3545',
-    cancelButtonColor: '#6c757d',
-    confirmButtonText: 'Delete Record'
+    confirmButtonText: 'Delete'
   }).then((result) => {
     if (result.isConfirmed) {
       savedRegistrations = savedRegistrations.filter(r => r.id !== id);
-      saveRegistrationsToStorage();
-      renderSavedTable();
-      Swal.fire('Deleted!', 'Record removed from local storage.', 'success');
+      localStorage.setItem(REG_STORAGE_KEY, JSON.stringify(savedRegistrations));
+      renderRegTable();
+      Swal.fire('Deleted!', 'Record removed.', 'success');
     }
   });
 }
@@ -368,22 +342,20 @@ function confirmResetLocalStorage() {
     icon: 'error',
     showCancelButton: true,
     confirmButtonColor: '#dc3545',
-    cancelButtonColor: '#6c757d',
     confirmButtonText: 'Yes, Wipe Everything'
   }).then((result) => {
     if (result.isConfirmed) {
       savedRegistrations = [];
-      localStorage.removeItem(STORAGE_KEY);
-      renderSavedTable();
-      Swal.fire('Reset Complete', 'Local storage wiped successfully.', 'info');
+      localStorage.removeItem(REG_STORAGE_KEY);
+      renderRegTable();
+      Swal.fire('Reset Complete', 'Registration data wiped.', 'info');
     }
   });
 }
 
-// Export Table Data to Excel File
 function exportToExcel() {
   if (savedRegistrations.length === 0) {
-    Swal.fire('No Data', 'There are no records available to export.', 'info');
+    Swal.fire('No Data', 'No records available to export.', 'info');
     return;
   }
 
@@ -398,12 +370,222 @@ function exportToExcel() {
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Registrations");
-
-  const today = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(workbook, `TJM_Ramadan_Registrations_${today}.xlsx`);
+  XLSX.writeFile(workbook, `TJM_Ramadan_Registrations_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// Security Helper Utility
+/* ==========================================================================
+   2. ISSUE PORRIDGE MODULE SCANNERS & HANDLERS
+   ========================================================================== */
+
+function startIssueScanner() {
+  if (isIssueScannerActive) return;
+
+  issueScanner = new Html5Qrcode("qr-reader-issue");
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+  issueScanner.start(
+    { facingMode: "environment" },
+    config,
+    (decodedText) => {
+      stopIssueScanner();
+      processIssueMemberId(decodedText.trim());
+    }
+  ).then(() => {
+    isIssueScannerActive = true;
+    updateIssueScannerBtnUI(true);
+  }).catch(() => {
+    isIssueScannerActive = false;
+    updateIssueScannerBtnUI(false);
+  });
+}
+
+function stopIssueScanner() {
+  if (issueScanner && isIssueScannerActive) {
+    issueScanner.stop().then(() => {
+      isIssueScannerActive = false;
+      updateIssueScannerBtnUI(false);
+    }).catch(err => console.error("Issue scanner stop error:", err));
+  }
+}
+
+function toggleIssueCamera() {
+  if (isIssueScannerActive) stopIssueScanner();
+  else startIssueScanner();
+}
+
+function updateIssueScannerBtnUI(active) {
+  const btn = document.getElementById('toggleIssueCameraBtn');
+  if (!btn) return;
+  btn.innerHTML = active ? `<i class="fa-solid fa-pause me-1"></i> Pause Scanner` : `<i class="fa-solid fa-play me-1"></i> Start Scanner`;
+  btn.className = active ? "btn btn-outline-warning btn-sm rounded-pill" : "btn btn-outline-success btn-sm rounded-pill";
+}
+
+function handleManualIssueSubmit() {
+  const input = document.getElementById('manualIssueIdInput');
+  const val = input.value.trim();
+  if (!val) {
+    Swal.fire('Warning', 'Please enter a valid Membership ID', 'warning');
+    return;
+  }
+  stopIssueScanner();
+  processIssueMemberId(val);
+  input.value = '';
+}
+
+function processIssueMemberId(memberId) {
+  // 1. Check Duplicate Issue
+  const alreadyIssued = savedIssuedPorridge.find(item => item.id.toLowerCase() === memberId.toLowerCase());
+  if (alreadyIssued) {
+    playSound('scan_duplicate.mp3');
+    Swal.fire({
+      icon: 'warning',
+      title: 'Porridge Already Issued!',
+      html: `
+        <div class="text-start">
+          <p><strong>ID:</strong> ${alreadyIssued.id}</p>
+          <p><strong>Name:</strong> ${alreadyIssued.name}</p>
+          <p><strong>Porridge Count:</strong> ${alreadyIssued.count}</p>
+          <p><strong>Issued At:</strong> ${alreadyIssued.timestamp}</p>
+        </div>
+      `
+    }).then(() => startIssueScanner());
+    return;
+  }
+
+  // 2. Fetch from registered.json
+  const registeredMember = registeredMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
+  if (!registeredMember) {
+    playSound('scan_warning.mp3');
+    Swal.fire({
+      icon: 'error',
+      title: 'Not Pre-Registered',
+      text: `Card ${memberId} was not found in registered.json!`
+    }).then(() => startIssueScanner());
+    return;
+  }
+
+  // 3. Play Sound associated with member count
+  playSound(registeredMember.count);
+
+  const now = new Date();
+  const timestampStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+
+  // Save transaction
+  savedIssuedPorridge.unshift({
+    id: registeredMember.id,
+    name: registeredMember.name,
+    count: registeredMember.count,
+    timestamp: timestampStr
+  });
+
+  localStorage.setItem(ISSUE_STORAGE_KEY, JSON.stringify(savedIssuedPorridge));
+  renderIssueTable();
+
+  // Success Alert
+  Swal.fire({
+    icon: 'success',
+    title: 'Porridge Issued Successfully!',
+    html: `
+      <div class="text-start">
+        <p><strong>ID:</strong> ${registeredMember.id}</p>
+        <p><strong>Name:</strong> ${registeredMember.name}</p>
+        <p><strong>Count:</strong> <span class="badge bg-success fs-6">${registeredMember.count}</span></p>
+      </div>
+    `,
+    timer: 2500,
+    showConfirmButton: true
+  }).then(() => startIssueScanner());
+}
+
+function renderIssueTable() {
+  const tbody = document.getElementById('issuedTableBody');
+  tbody.innerHTML = '';
+
+  const displayList = showAllIssueRecords ? savedIssuedPorridge : savedIssuedPorridge.slice(0, 25);
+
+  displayList.forEach((item) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="fw-bold">${escapeHtml(item.id)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td class="text-center"><span class="badge bg-success rounded-pill px-3 py-2">${item.count}</span></td>
+      <td><small class="text-muted">${item.timestamp}</small></td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteIssueRecord('${item.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('totalIssuedCount').textContent = `${savedIssuedPorridge.length} Porridge Issued`;
+}
+
+function toggleIssueRecordViewLimit() {
+  showAllIssueRecords = !showAllIssueRecords;
+  document.getElementById('issueTableSubtitle').textContent = showAllIssueRecords ? `Displaying all ${savedIssuedPorridge.length} issued records` : `Displaying recent 25 issued records`;
+  renderIssueTable();
+}
+
+function deleteIssueRecord(id) {
+  const record = savedIssuedPorridge.find(r => r.id === id);
+  if (!record) return;
+
+  Swal.fire({
+    title: 'Confirm Deletion',
+    html: `Remove porridge issuance record for <strong>${record.id}</strong>?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    confirmButtonText: 'Delete'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      savedIssuedPorridge = savedIssuedPorridge.filter(r => r.id !== id);
+      localStorage.setItem(ISSUE_STORAGE_KEY, JSON.stringify(savedIssuedPorridge));
+      renderIssueTable();
+      Swal.fire('Deleted!', 'Issuance log removed.', 'success');
+    }
+  });
+}
+
+function confirmResetIssueStorage() {
+  Swal.fire({
+    title: 'Reset All Issuance Data?',
+    text: 'This action will wipe all saved porridge issuance logs stored locally!',
+    icon: 'error',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    confirmButtonText: 'Yes, Wipe Everything'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      savedIssuedPorridge = [];
+      localStorage.removeItem(ISSUE_STORAGE_KEY);
+      renderIssueTable();
+      Swal.fire('Reset Complete', 'Issuance data wiped.', 'info');
+    }
+  });
+}
+
+function exportIssueToExcel() {
+  if (savedIssuedPorridge.length === 0) {
+    Swal.fire('No Data', 'No issued records available to export.', 'info');
+    return;
+  }
+
+  const exportData = savedIssuedPorridge.map((item, index) => ({
+    'S/N': index + 1,
+    'Membership ID': item.id,
+    'Member Name': item.name,
+    'Porridge Count': item.count,
+    'Issued Date & Time': item.timestamp
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Issued Porridge");
+  XLSX.writeFile(workbook, `TJM_Ramadan_Porridge_Issued_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// Escaping utility
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")

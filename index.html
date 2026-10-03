@@ -43,12 +43,12 @@
       font-weight: 700;
       border-radius: 12px;
     }
-    #qr-reader {
+    .qr-reader-box {
       border-radius: 12px;
       overflow: hidden;
       border: 2px dashed #cbd5e1;
     }
-    #qr-reader video {
+    .qr-reader-box video {
       object-fit: cover;
       border-radius: 8px;
     }
@@ -57,8 +57,8 @@
       border-radius: 16px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
-    /* Hide registration section initially on load */
-    #registrationView {
+    /* Hidden views initially */
+    #registrationView, #issuePorridgeView {
       display: none;
     }
   </style>
@@ -80,7 +80,7 @@
 
   <div class="container pb-5">
     
-    <!-- Main Dashboard Section (Visible on initial page load) -->
+    <!-- Main Dashboard Section -->
     <div id="dashboardSection" class="row g-4 mb-4">
       <div class="col-md-6">
         <div class="card action-card bg-primary text-white p-4 h-100" onclick="showRegistrationView()">
@@ -94,11 +94,11 @@
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card action-card text-white p-4 h-100" style="background-color: #0d9488;" onclick="swalPorridgeInfo()">
+        <div class="card action-card text-white p-4 h-100" style="background-color: #0d9488;" onclick="showIssuePorridgeView()">
           <div class="d-flex align-items-center justify-content-between">
             <div>
               <h4 class="fw-bold mb-1"><i class="fa-solid fa-bowl-rice me-2"></i> Issue Porridge</h4>
-              <p class="mb-0 text-white-50">Distribution tracking and verification</p>
+              <p class="mb-0 text-white-50">Verify registered members and issue porridge</p>
             </div>
             <i class="fa-solid fa-chevron-right fs-4 opacity-75"></i>
           </div>
@@ -106,7 +106,7 @@
       </div>
     </div>
 
-    <!-- Registration & Distribution Page View (Hidden initially) -->
+    <!-- 1. MEMBER REGISTRATION VIEW -->
     <div id="registrationView">
       <div class="d-flex align-items-center justify-content-between mb-3">
         <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="showDashboardView()">
@@ -115,16 +115,15 @@
         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold" id="totalSavedCount">0 Records Saved</span>
       </div>
 
-      <!-- Scanner & Manual Input Section -->
+      <!-- Registration Scanner Section -->
       <div class="card border-0 shadow-sm rounded-4 mb-4">
         <div class="card-body p-4">
           <h5 class="fw-bold mb-3"><i class="fa-solid fa-qrcode me-2 text-primary"></i> Membership Registration</h5>
-          
           <div class="row g-3">
             <div class="col-md-7">
-              <div id="qr-reader" class="w-100"></div>
-              <div id="scannerControls" class="mt-2 text-center">
-                <button id="toggleCameraBtn" class="btn btn-outline-primary btn-sm rounded-pill" onclick="toggleCamera()">
+              <div id="qr-reader" class="qr-reader-box w-100"></div>
+              <div class="mt-2 text-center">
+                <button id="toggleRegCameraBtn" class="btn btn-outline-primary btn-sm rounded-pill" onclick="toggleRegCamera()">
                   <i class="fa-solid fa-video me-1"></i> Pause Scanner
                 </button>
               </div>
@@ -139,28 +138,27 @@
                   <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
               </div>
-              <small class="text-muted">In case QR scanning is unavailable or damaged, type the exact Membership ID above.</small>
+              <small class="text-muted">Type the exact Membership ID if scanning fails.</small>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Registered Members Table -->
+      <!-- Registration Table -->
       <div class="table-container p-4">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
           <div>
             <h5 class="fw-bold mb-0">Saved Registrations</h5>
-            <small class="text-muted" id="tableSubtitle">Displaying recent 25 records</small>
+            <small class="text-muted" id="regTableSubtitle">Displaying recent 25 records</small>
           </div>
-          <!-- Icon-Only Action Buttons for Table Header -->
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleRecordViewLimit()" id="toggleViewBtn" title="Toggle Show All / Recent 25">
+            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleRecordViewLimit()" title="Toggle Show All / Recent 25">
               <i class="fa-solid fa-list"></i>
             </button>
             <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportToExcel()" title="Export to Excel">
               <i class="fa-solid fa-file-excel"></i>
             </button>
-            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetLocalStorage()" title="Reset All Local Data">
+            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetLocalStorage()" title="Reset All Registration Data">
               <i class="fa-solid fa-trash-can"></i>
             </button>
           </div>
@@ -181,11 +179,86 @@
           </table>
         </div>
       </div>
-
     </div>
+
+    <!-- 2. ISSUE PORRIDGE VIEW -->
+    <div id="issuePorridgeView">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="showDashboardView()">
+          <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </button>
+        <span class="badge bg-teal text-white border px-3 py-2 rounded-pill fw-bold" style="background-color: #0d9488;" id="totalIssuedCount">0 Porridge Issued</span>
+      </div>
+
+      <!-- Issue Porridge Scanner Section -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3" style="color: #0d9488;"><i class="fa-solid fa-bowl-rice me-2"></i> Issue Porridge Module</h5>
+          <div class="row g-3">
+            <div class="col-md-7">
+              <div id="qr-reader-issue" class="qr-reader-box w-100"></div>
+              <div class="mt-2 text-center">
+                <button id="toggleIssueCameraBtn" class="btn btn-outline-success btn-sm rounded-pill" onclick="toggleIssueCamera()">
+                  <i class="fa-solid fa-video me-1"></i> Pause Scanner
+                </button>
+              </div>
+            </div>
+
+            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md">
+              <label class="form-label fw-semibold">Manual Card Search & Issue</label>
+              <div class="input-group mb-3">
+                <span class="input-group-text bg-light"><i class="fa-solid fa-id-card"></i></span>
+                <input type="text" id="manualIssueIdInput" class="form-control" placeholder="e.g. PR/999/1/O/X">
+                <button class="btn btn-success" style="background-color: #0d9488; border-color: #0d9488;" type="button" onclick="handleManualIssueSubmit()">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+              </div>
+              <small class="text-muted">Checks card against pre-registered file (registered.json).</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Porridge Issuance Table -->
+      <div class="table-container p-4">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+          <div>
+            <h5 class="fw-bold mb-0">Issued Porridge Log</h5>
+            <small class="text-muted" id="issueTableSubtitle">Displaying recent 25 issued records</small>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleIssueRecordViewLimit()" title="Toggle Show All / Recent 25">
+              <i class="fa-solid fa-list"></i>
+            </button>
+            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportIssueToExcel()" title="Export Issuance Log to Excel">
+              <i class="fa-solid fa-file-excel"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetIssueStorage()" title="Reset All Issuance Data">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="issuedTable" class="table table-hover align-middle w-100">
+            <thead class="table-light">
+              <tr>
+                <th>Membership ID</th>
+                <th>Member Name</th>
+                <th class="text-center">Porridge Count</th>
+                <th>Issued Date & Time</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="issuedTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Family Count Selection Modal -->
+  <!-- Family Count Selection Modal (Registration Mode) -->
   <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg rounded-4">
@@ -199,10 +272,7 @@
             <div><strong class="text-muted">Name:</strong> <span id="modalMemberName" class="fw-bold text-dark"></span></div>
           </div>
           <p class="fw-semibold text-secondary mb-3">Select Family Member Count (1 to 12):</p>
-          
-          <div class="row g-2" id="familyCountButtons">
-            <!-- Buttons 1-12 dynamically generated -->
-          </div>
+          <div class="row g-2" id="familyCountButtons"></div>
         </div>
       </div>
     </div>

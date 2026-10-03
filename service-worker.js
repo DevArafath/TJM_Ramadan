@@ -1,56 +1,50 @@
-const CACHE_NAME = "tjm-ramadan-v1";
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./register-member.html",
-  "./issue-porridge.html",
-  "./master_members.json",
-  "./manifest.json",
-  "./css/style.css",
-  "./js/app.js",
-  "./js/register-member.js",
-  "./js/issue-porridge.js",
-  "./images/logo.png",
-  "./images/icon-192.png",
-  "./images/icon-512.png",
-  "./images/icon-maskable-512.png"
+const CACHE_NAME = 'tjm-ramadan-v1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './app.js',
+  './manifest.json',
+  './master_members.json',
+  './images/logo.png',
+  './images/icon-192.png',
+  './images/icon-512.png',
+  './images/icon-maskable-512.png',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css',
+  'https://cdn.jsdelivr.net/npm/sweetalert2@11',
+  'https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css',
+  'https://code.jquery.com/jquery-3.7.0.min.js',
+  'https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js',
+  'https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js',
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
-self.addEventListener("install", event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys =>
+    caches.keys().then((keys) =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) return caches.delete(key);
+        })
       )
-    ).then(() => self.clients.claim())
+    )
   );
+  self.clients.claim();
 });
 
-self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
-
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type === "opaque") {
-          return response;
-        }
-
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        return response;
-      }).catch(() => caches.match("./index.html"));
+    caches.match(event.request).then((cachedResponse) => {
+      return cachedResponse || fetch(event.request);
     })
   );
 });

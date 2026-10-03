@@ -1,70 +1,218 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f5132">
-  <meta name="description" content="TJM Ramadan member registration and porridge management">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TJM Ramadan Management Portal</title>
+
+  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="images/icon-192.png">
-  <link rel="apple-touch-icon" href="images/icon-192.png">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
-  <link href="css/style.css" rel="stylesheet">
-  <title>TJM Ramadan</title>
+  <meta name="theme-color" content="#0d9488">
+  <link rel="icon" href="images/logo.png" type="image/png">
+
+  <!-- CSS Libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+    }
+    .navbar {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+    .action-card {
+      border: none;
+      border-radius: 16px;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    }
+    .action-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .badge-count {
+      width: 52px;
+      height: 52px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border-radius: 12px;
+    }
+    #qr-reader {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px dashed #cbd5e1;
+    }
+    #qr-reader video {
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .table-container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+  </style>
 </head>
 <body>
-<nav class="navbar app-navbar py-2">
-  <div class="container">
-    <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
-      <img src="images/logo.png" class="brand-logo" alt="TJM Logo">
-      <span><span class="brand-name d-block">TJM Ramadan</span><small class="brand-subtitle">THAQWA JUMMAH MASJID</small></span>
-    </a>
-    <button class="btn btn-sm btn-outline-tjm install-btn"><i class="fa-solid fa-download me-1"></i> Install</button>
-  </div>
-</nav>
 
-<main class="container py-4 py-md-5">
-  <section class="hero mb-4 mb-md-5">
-    <div class="position-relative z-1">
-      <div class="small text-uppercase fw-bold opacity-75 mb-2">Ramadan Management</div>
-      <h1>Assalamu Alaikum</h1>
-      <p>Welcome to the TJM Ramadan management portal. Select an activity below to continue.</p>
+  <!-- Navbar -->
+  <nav class="navbar navbar-dark py-3 shadow-sm mb-4">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-3 fw-bold" href="#">
+        <img src="images/logo.png" alt="TJM Logo" height="42" class="d-inline-block align-text-top" onerror="this.style.display='none'">
+        <span>TJM Ramadan Portal</span>
+      </a>
+      <button class="btn btn-outline-light btn-sm rounded-pill" onclick="triggerPwaInstall()" id="pwaInstallBtn" style="display: none;">
+        <i class="fa-solid fa-download me-1"></i> Install App
+      </button>
     </div>
-  </section>
+  </nav>
 
-  <div class="row g-3 g-md-4">
-    <div class="col-12 col-md-6">
-      <div class="action-card h-100 p-4">
-        <div class="action-icon mb-4"><i class="fa-solid fa-user-plus"></i></div>
-        <h3 class="h5 fw-bold">Register Member</h3>
-        <p class="text-secondary small mb-4">Scan a membership QR code, verify the member and record the family member count.</p>
-        <a href="register-member.html" class="btn btn-tjm w-100">
-          <i class="fa-solid fa-qrcode me-2"></i> Open Registration
-        </a>
+  <div class="container pb-5">
+    
+    <!-- Main Dashboard Section -->
+    <div id="dashboardSection" class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card action-card bg-primary text-white p-4 h-100" onclick="showRegistrationView()">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h4 class="fw-bold mb-1"><i class="fa-solid fa-user-plus me-2"></i> Register Member</h4>
+              <p class="mb-0 text-white-50">Scan member card and record family count</p>
+            </div>
+            <i class="fa-solid fa-chevron-right fs-4 opacity-75"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card action-card bg-teal text-white p-4 h-100 style-porridge" style="background-color: #0d9488;" onclick="swalPorridgeInfo()">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h4 class="fw-bold mb-1"><i class="fa-solid fa-bowl-rice me-2"></i> Issue Porridge</h4>
+              <p class="mb-0 text-white-50">Distribution tracking and verification</p>
+            </div>
+            <i class="fa-solid fa-chevron-right fs-4 opacity-75"></i>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="col-12 col-md-6">
-      <div class="action-card h-100 p-4">
-        <div class="action-icon mb-4"><i class="fa-solid fa-bowl-food"></i></div>
-        <h3 class="h5 fw-bold">Issue Porridge</h3>
-        <p class="text-secondary small mb-4">Record Ramadan porridge distribution using the member's QR membership card.</p>
-        <a href="issue-porridge.html" class="btn btn-outline-tjm w-100 py-2">
-          <i class="fa-solid fa-arrow-right me-2"></i> Open Porridge
-        </a>
+
+    <!-- Registration & Distribution Page View -->
+    <div id="registrationView" class="style-reg-view">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="showDashboardView()">
+          <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+        </button>
+        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold" id="totalSavedCount">0 Records Saved</span>
+      </div>
+
+      <!-- Scanner & Input Section -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3"><i class="fa-solid fa-qrcode me-2 text-primary"></i> Membership Registration</h5>
+          
+          <div class="row g-3">
+            <div class="col-md-7">
+              <div id="qr-reader" class="w-100"></div>
+              <div id="scannerControls" class="mt-2 text-center">
+                <button id="toggleCameraBtn" class="btn btn-outline-primary btn-sm rounded-pill" onclick="toggleCamera()">
+                  <i class="fa-solid fa-video me-1"></i> Pause Scanner
+                </button>
+              </div>
+            </div>
+
+            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md">
+              <label class="form-label fw-semibold">Manual Membership ID Entry</label>
+              <div class="input-group mb-3">
+                <span class="input-group-text bg-light"><i class="fa-solid fa-id-card"></i></span>
+                <input type="text" id="manualIdInput" class="form-control" placeholder="e.g. FG/001/6/O/G">
+                <button class="btn btn-primary" type="button" onclick="handleManualSubmit()">
+                  <i class="fa-solid fa-magnifying-glass"></i> Submit
+                </button>
+              </div>
+              <small class="text-muted">In case QR scanning is unavailable or damaged, type the exact Membership ID above.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Registered Members Table -->
+      <div class="table-container p-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+          <div>
+            <h5 class="fw-bold mb-0">Saved Registrations</h5>
+            <small class="text-muted" id="tableSubtitle">Displaying recent 25 records</small>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="toggleRecordViewLimit()" id="toggleViewBtn">
+              <i class="fa-solid fa-list me-1"></i> Show All Records
+            </button>
+            <button class="btn btn-sm btn-success rounded-pill px-3" onclick="exportToExcel()">
+              <i class="fa-solid fa-file-excel me-1"></i> Export to Excel
+            </button>
+            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="confirmResetLocalStorage()">
+              <i class="fa-solid fa-trash-can me-1"></i> Reset All Data
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="membersTable" class="table table-hover align-middle w-100">
+            <thead class="table-light">
+              <tr>
+                <th>Membership ID</th>
+                <th>Member Name</th>
+                <th class="text-center">Family Count</th>
+                <th>Scanned Date & Time</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="membersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Family Count Selection Modal -->
+  <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Member Information</h5>
+          <button type="button" class="btn-close" onclick="closeMemberModal()"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <div class="p-3 bg-light rounded-3 mb-3 text-start">
+            <div class="mb-1"><strong class="text-muted">ID:</strong> <span id="modalMemberId" class="fw-bold text-primary"></span></div>
+            <div><strong class="text-muted">Name:</strong> <span id="modalMemberName" class="fw-bold text-dark"></span></div>
+          </div>
+          <p class="fw-semibold text-secondary mb-3">Select Family Member Count (1 to 12):</p>
+          
+          <div class="row g-2" id="familyCountButtons">
+            <!-- Buttons 1-12 dynamically generated -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="text-center footer mt-5">
-    <div>Built for Thaqwa Jummah Masjid</div>
-    <div class="mt-1">TJM Ramadan • PWA Application</div>
-  </div>
-</main>
-<script src="js/app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- JS Libraries -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
 </body>
 </html>

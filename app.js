@@ -28,6 +28,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFamilyCountButtons();
   renderRegTable();
   renderIssueTable();
+
+  // Initialize UI button states to "Start Scanner"
+  updateRegScannerBtnUI(false);
+  updateIssueScannerBtnUI(false);
 });
 
 // Service Worker Registration
@@ -85,7 +89,6 @@ function loadLocalStorageData() {
 
 // Sound Helper
 function playSound(soundFileName) {
-  // Clamp number audio to 1-12 if numeric count > 12
   let targetSound = soundFileName;
   if (!isNaN(soundFileName)) {
     let countNum = parseInt(soundFileName, 10);
@@ -98,13 +101,13 @@ function playSound(soundFileName) {
   audio.play().catch((err) => console.log('Audio playback prevented:', err));
 }
 
-// View Switches
+// View Switches (Scanners do NOT auto-start upon view switch)
 function showRegistrationView() {
   document.getElementById('dashboardSection').style.display = 'none';
   document.getElementById('issuePorridgeView').style.display = 'none';
   document.getElementById('registrationView').style.display = 'block';
   stopIssueScanner();
-  startRegScanner();
+  stopRegScanner();
 }
 
 function showIssuePorridgeView() {
@@ -112,7 +115,7 @@ function showIssuePorridgeView() {
   document.getElementById('registrationView').style.display = 'none';
   document.getElementById('issuePorridgeView').style.display = 'block';
   stopRegScanner();
-  startIssueScanner();
+  stopIssueScanner();
 }
 
 function showDashboardView() {
@@ -155,6 +158,9 @@ function stopRegScanner() {
       isRegScannerActive = false;
       updateRegScannerBtnUI(false);
     }).catch(err => console.error("Reg scanner stop error:", err));
+  } else {
+    isRegScannerActive = false;
+    updateRegScannerBtnUI(false);
   }
 }
 
@@ -177,12 +183,13 @@ function handleManualSubmit() {
     Swal.fire('Warning', 'Please enter a valid Membership ID', 'warning');
     return;
   }
+  const wasScanning = isRegScannerActive;
   stopRegScanner();
-  processRegMemberId(val);
+  processRegMemberId(val, wasScanning);
   input.value = '';
 }
 
-function processRegMemberId(memberId) {
+function processRegMemberId(memberId, shouldRestartScanner = true) {
   const existingRecord = savedRegistrations.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (existingRecord) {
     playSound('scan_duplicate.mp3');
@@ -197,7 +204,9 @@ function processRegMemberId(memberId) {
           <p><strong>Scanned At:</strong> ${existingRecord.timestamp}</p>
         </div>
       `
-    }).then(() => startRegScanner());
+    }).then(() => {
+      if (shouldRestartScanner) startRegScanner();
+    });
     return;
   }
 
@@ -208,11 +217,13 @@ function processRegMemberId(memberId) {
       icon: 'error',
       title: 'Member Not Found',
       text: `No master record found matching ID: ${memberId}`
-    }).then(() => startRegScanner());
+    }).then(() => {
+      if (shouldRestartScanner) startRegScanner();
+    });
     return;
   }
 
-  currentEditingMember = { ...matchedMember, isEditMode: false };
+  currentEditingMember = { ...matchedMember, isEditMode: false, wasScanningBefore: shouldRestartScanner };
   openMemberModal(matchedMember.id, matchedMember.name);
 }
 
@@ -240,8 +251,10 @@ function openMemberModal(id, name) {
 function closeMemberModal() {
   const modalEl = bootstrap.Modal.getInstance(document.getElementById('memberModal'));
   if (modalEl) modalEl.hide();
+  if (currentEditingMember && currentEditingMember.wasScanningBefore) {
+    startRegScanner();
+  }
   currentEditingMember = null;
-  startRegScanner();
 }
 
 function selectFamilyCount(count) {
@@ -249,6 +262,8 @@ function selectFamilyCount(count) {
 
   const now = new Date();
   const timestampStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+
+  const shouldRestartScanner = currentEditingMember ? currentEditingMember.wasScanningBefore : false;
 
   if (currentEditingMember.isEditMode) {
     const idx = savedRegistrations.findIndex(r => r.id === currentEditingMember.id);
@@ -272,7 +287,11 @@ function selectFamilyCount(count) {
   if (modalEl) modalEl.hide();
 
   currentEditingMember = null;
-  startRegScanner();
+
+  // Only restart scanner if it was actively running prior to edit/scan
+  if (shouldRestartScanner) {
+    startRegScanner();
+  }
 }
 
 function renderRegTable() {
@@ -306,11 +325,14 @@ function toggleRecordViewLimit() {
 }
 
 function editRegRecord(id) {
+  // Save current camera status before stopping
+  const wasScanning = isRegScannerActive;
   stopRegScanner();
+
   const record = savedRegistrations.find(r => r.id === id);
   if (!record) return;
 
-  currentEditingMember = { ...record, isEditMode: true };
+  currentEditingMember = { ...record, isEditMode: true, wasScanningBefore: wasScanning };
   openMemberModal(record.id, record.name);
 }
 
@@ -405,6 +427,9 @@ function stopIssueScanner() {
       isIssueScannerActive = false;
       updateIssueScannerBtnUI(false);
     }).catch(err => console.error("Issue scanner stop error:", err));
+  } else {
+    isIssueScannerActive = false;
+    updateIssueScannerBtnUI(false);
   }
 }
 
@@ -427,12 +452,13 @@ function handleManualIssueSubmit() {
     Swal.fire('Warning', 'Please enter a valid Membership ID', 'warning');
     return;
   }
+  const wasScanning = isIssueScannerActive;
   stopIssueScanner();
-  processIssueMemberId(val);
+  processIssueMemberId(val, wasScanning);
   input.value = '';
 }
 
-function processIssueMemberId(memberId) {
+function processIssueMemberId(memberId, shouldRestartScanner = true) {
   // 1. Check Duplicate Issue
   const alreadyIssued = savedIssuedPorridge.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (alreadyIssued) {
@@ -448,7 +474,9 @@ function processIssueMemberId(memberId) {
           <p><strong>Issued At:</strong> ${alreadyIssued.timestamp}</p>
         </div>
       `
-    }).then(() => startIssueScanner());
+    }).then(() => {
+      if (shouldRestartScanner) startIssueScanner();
+    });
     return;
   }
 
@@ -460,7 +488,9 @@ function processIssueMemberId(memberId) {
       icon: 'error',
       title: 'Not Pre-Registered',
       text: `Card ${memberId} was not found in registered.json!`
-    }).then(() => startIssueScanner());
+    }).then(() => {
+      if (shouldRestartScanner) startIssueScanner();
+    });
     return;
   }
 
@@ -494,7 +524,9 @@ function processIssueMemberId(memberId) {
     `,
     timer: 2500,
     showConfirmButton: true
-  }).then(() => startIssueScanner());
+  }).then(() => {
+    if (shouldRestartScanner) startIssueScanner();
+  });
 }
 
 function renderIssueTable() {

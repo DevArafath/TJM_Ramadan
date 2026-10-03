@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5132">
+  <meta name="description" content="TJM Ramadan member registration and porridge management">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="images/icon-192.png">
+  <link rel="apple-touch-icon" href="images/icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+  <title>TJM Ramadan</title>
+</head>
+<body>
+<nav class="navbar app-navbar py-2">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
+      <img src="images/logo.png" class="brand-logo" alt="TJM Logo">
+      <span><span class="brand-name d-block">TJM Ramadan</span><small class="brand-subtitle">THAQWA JUMMAH MASJID</small></span>
+    </a>
+    <button class="btn btn-sm btn-outline-tjm install-btn"><i class="fa-solid fa-download me-1"></i> Install</button>
+  </div>
+</nav>
+
+<main class="container py-4 py-md-5">
+  <section class="hero mb-4 mb-md-5">
+    <div class="position-relative z-1">
+      <div class="small text-uppercase fw-bold opacity-75 mb-2">Ramadan Management</div>
+      <h1>Assalamu Alaikum</h1>
+      <p>Welcome to the TJM Ramadan management portal. Select an activity below to continue.</p>
+    </div>
+  </section>
+
+  <div class="row g-3 g-md-4">
+    <div class="col-12 col-md-6">
+      <div class="action-card h-100 p-4">
+        <div class="action-icon mb-4"><i class="fa-solid fa-user-plus"></i></div>
+        <h3 class="h5 fw-bold">Register Member</h3>
+        <p class="text-secondary small mb-4">Scan a membership QR code, verify the member and record the family member count.</p>
+        <a href="register-member.html" class="btn btn-tjm w-100">
+          <i class="fa-solid fa-qrcode me-2"></i> Open Registration
+        </a>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="action-card h-100 p-4">
+        <div class="action-icon mb-4"><i class="fa-solid fa-bowl-food"></i></div>
+        <h3 class="h5 fw-bold">Issue Porridge</h3>
+        <p class="text-secondary small mb-4">Record Ramadan porridge distribution using the member's QR membership card.</p>
+        <a href="issue-porridge.html" class="btn btn-outline-tjm w-100 py-2">
+          <i class="fa-solid fa-arrow-right me-2"></i> Open Porridge
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center footer mt-5">
+    <div>Built for Thaqwa Jummah Masjid</div>
+    <div class="mt-1">TJM Ramadan • PWA Application</div>
+  </div>
+</main>
+<script src="js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

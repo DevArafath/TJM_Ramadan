@@ -1,4 +1,4 @@
-const CACHE = 'tjm-ramadan-v2';
+const CACHE = 'tjm-ramadan-v3';
 const SHELL = ['./', 'index.html', 'manifest.json', 'css/style.css', 'js/app.js',
   'images/logo.png', 'images/icon-192.png', 'images/icon-512.png'];
 
@@ -21,7 +21,15 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.match(req)));
     return;
   }
-  // everything else: cache first, then network (and store, incl. CDN libraries and sounds)
+  // own files: network first (always fresh), cache as offline fallback
+  if (url.origin === location.origin) {
+    e.respondWith(fetch(req).then(r => {
+      if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return r;
+    }).catch(() => caches.match(req).then(hit => hit || caches.match('index.html'))));
+    return;
+  }
+  // CDN libraries: cache first, then network (and store, incl. CDN libraries and sounds)
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
     if (r && (r.ok || r.type === 'opaque')) {
       const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy));

@@ -1,4 +1,5 @@
 (() => {
+  window.TJM_READY = true;
   if (!window.Swal) window.Swal = { fire: (t, m) => { alert((typeof t === 'object' ? t.title : t) + (m ? '\n' + m : '')); return Promise.resolve({ isConfirmed: confirm('Continue?') }); } };
   const KEY = 'tjm_members';
   const $ = s => document.querySelector(s);
@@ -26,12 +27,13 @@
 
   async function startScanner() {
     if (scanning || busy) return;
+    if (!window.isSecureContext || !navigator.mediaDevices) { Swal.fire('Camera blocked', 'The camera only works on HTTPS (e.g. your GitHub Pages link) or localhost, not when opening the file directly. Use manual entry for now.', 'warning'); return; }
     try {
       if (!window.Html5Qrcode) throw new Error('scanner library not loaded');
       scanner = scanner || new Html5Qrcode('reader');
       await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 230, height: 230 } }, onScan, () => {});
       scanning = true; updateToggle();
-    } catch (e) { scanning = false; updateToggle(); Swal.fire('Camera error', 'Unable to access the camera. Use manual entry instead.', 'warning'); }
+    } catch (e) { scanning = false; updateToggle(); Swal.fire('Camera error', 'Unable to start the camera: ' + (e && e.message || e) + '. Allow camera permission or use manual entry.', 'warning'); }
   }
   async function stopScanner() {
     if (scanner && scanning) { try { await scanner.stop(); } catch {} }

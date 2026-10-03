@@ -24,7 +24,9 @@
   }
   window.addEventListener('hashchange',show);
   document.addEventListener('DOMContentLoaded',show);
-  window.addEventListener('error',function(e){console.error('App error:',e.message,e.filename,e.lineno);});
+  function banner(msg){var b=document.getElementById('errBanner');if(!b)return;b.textContent=msg;b.style.display='block';}
+  window.addEventListener('error',function(e){banner('Error: '+e.message+(e.filename?' ('+e.filename.split('/').pop()+':'+e.lineno+')':''));});
+  window.addEventListener('load',function(){setTimeout(function(){if(!window.TJM_READY)banner('js/app.js did not run. Check that the file exists at js/app.js (exact name, lowercase) and is not empty.');},800);});
 })();
 </script>
 </head>
@@ -125,6 +127,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<div id="errBanner" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#b00020;color:#fff;padding:.6rem 1rem;font-size:.85rem"></div>
 <script src="js/app.js"></script>
 </body>
 </html>

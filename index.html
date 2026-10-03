@@ -57,6 +57,10 @@
       border-radius: 16px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
+    /* Hide registration section initially on load */
+    #registrationView {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -76,7 +80,7 @@
 
   <div class="container pb-5">
     
-    <!-- Main Dashboard Section -->
+    <!-- Main Dashboard Section (Visible on initial page load) -->
     <div id="dashboardSection" class="row g-4 mb-4">
       <div class="col-md-6">
         <div class="card action-card bg-primary text-white p-4 h-100" onclick="showRegistrationView()">
@@ -90,7 +94,7 @@
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card action-card bg-teal text-white p-4 h-100 style-porridge" style="background-color: #0d9488;" onclick="swalPorridgeInfo()">
+        <div class="card action-card text-white p-4 h-100" style="background-color: #0d9488;" onclick="swalPorridgeInfo()">
           <div class="d-flex align-items-center justify-content-between">
             <div>
               <h4 class="fw-bold mb-1"><i class="fa-solid fa-bowl-rice me-2"></i> Issue Porridge</h4>
@@ -102,8 +106,8 @@
       </div>
     </div>
 
-    <!-- Registration & Distribution Page View -->
-    <div id="registrationView" class="style-reg-view">
+    <!-- Registration & Distribution Page View (Hidden initially) -->
+    <div id="registrationView">
       <div class="d-flex align-items-center justify-content-between mb-3">
         <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="showDashboardView()">
           <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
@@ -111,7 +115,7 @@
         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold" id="totalSavedCount">0 Records Saved</span>
       </div>
 
-      <!-- Scanner & Input Section -->
+      <!-- Scanner & Manual Input Section -->
       <div class="card border-0 shadow-sm rounded-4 mb-4">
         <div class="card-body p-4">
           <h5 class="fw-bold mb-3"><i class="fa-solid fa-qrcode me-2 text-primary"></i> Membership Registration</h5>
@@ -132,7 +136,7 @@
                 <span class="input-group-text bg-light"><i class="fa-solid fa-id-card"></i></span>
                 <input type="text" id="manualIdInput" class="form-control" placeholder="e.g. FG/001/6/O/G">
                 <button class="btn btn-primary" type="button" onclick="handleManualSubmit()">
-                  <i class="fa-solid fa-magnifying-glass"></i> Submit
+                  <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
               </div>
               <small class="text-muted">In case QR scanning is unavailable or damaged, type the exact Membership ID above.</small>
@@ -143,20 +147,21 @@
 
       <!-- Registered Members Table -->
       <div class="table-container p-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
           <div>
             <h5 class="fw-bold mb-0">Saved Registrations</h5>
             <small class="text-muted" id="tableSubtitle">Displaying recent 25 records</small>
           </div>
+          <!-- Icon-Only Action Buttons for Table Header -->
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="toggleRecordViewLimit()" id="toggleViewBtn">
-              <i class="fa-solid fa-list me-1"></i> Show All Records
+            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleRecordViewLimit()" id="toggleViewBtn" title="Toggle Show All / Recent 25">
+              <i class="fa-solid fa-list"></i>
             </button>
-            <button class="btn btn-sm btn-success rounded-pill px-3" onclick="exportToExcel()">
-              <i class="fa-solid fa-file-excel me-1"></i> Export to Excel
+            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportToExcel()" title="Export to Excel">
+              <i class="fa-solid fa-file-excel"></i>
             </button>
-            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="confirmResetLocalStorage()">
-              <i class="fa-solid fa-trash-can me-1"></i> Reset All Data
+            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetLocalStorage()" title="Reset All Local Data">
+              <i class="fa-solid fa-trash-can"></i>
             </button>
           </div>
         </div>

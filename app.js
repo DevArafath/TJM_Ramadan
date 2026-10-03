@@ -319,14 +319,11 @@ function renderSavedTable() {
 
 function toggleRecordViewLimit() {
   showAllRecords = !showAllRecords;
-  const btn = document.getElementById('toggleViewBtn');
   const subtitle = document.getElementById('tableSubtitle');
 
   if (showAllRecords) {
-    btn.innerHTML = `<i class="fa-solid fa-filter me-1"></i> Show Recent 25`;
     subtitle.textContent = `Displaying all ${savedRegistrations.length} records`;
   } else {
-    btn.innerHTML = `<i class="fa-solid fa-list me-1"></i> Show All Records`;
     subtitle.textContent = `Displaying recent 25 records`;
   }
   renderSavedTable();

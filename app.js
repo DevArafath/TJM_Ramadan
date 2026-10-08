@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFamilyCountButtons();
   renderRegTable();
   renderIssueTable();
+  updateDashboardStats();
 
-  // Initialize UI button states to "Start Scanner"
   updateRegScannerBtnUI(false);
   updateIssueScannerBtnUI(false);
 });
@@ -60,7 +60,7 @@ function triggerPwaInstall() {
   }
 }
 
-// Fetch master_members.json & registered.json
+// Fetch JSON Data
 async function loadMasterData() {
   try {
     const [resMaster, resReg] = await Promise.all([
@@ -68,14 +68,10 @@ async function loadMasterData() {
       fetch('./registered.json').catch(() => null)
     ]);
 
-    if (resMaster && resMaster.ok) {
-      masterMembers = await resMaster.json();
-    }
-    if (resReg && resReg.ok) {
-      registeredMembers = await resReg.json();
-    }
+    if (resMaster && resMaster.ok) masterMembers = await resMaster.json();
+    if (resReg && resReg.ok) registeredMembers = await resReg.json();
   } catch (error) {
-    console.error('Error loading JSON data files:', error);
+    console.error('Error loading JSON files:', error);
   }
 }
 
@@ -85,6 +81,18 @@ function loadLocalStorageData() {
 
   const issueData = localStorage.getItem(ISSUE_STORAGE_KEY);
   savedIssuedPorridge = issueData ? JSON.parse(issueData) : [];
+}
+
+// Visual Screen Flash Feedback
+function flashScreenBorder(type) {
+  document.body.classList.remove('flash-success', 'flash-warning', 'flash-error');
+  if (type === 'success') document.body.classList.add('flash-success');
+  else if (type === 'warning') document.body.classList.add('flash-warning');
+  else if (type === 'error') document.body.classList.add('flash-error');
+
+  setTimeout(() => {
+    document.body.classList.remove('flash-success', 'flash-warning', 'flash-error');
+  }, 1200);
 }
 
 // Sound Helper
@@ -98,10 +106,29 @@ function playSound(soundFileName) {
   }
 
   const audio = new Audio(`sounds/${targetSound}`);
-  audio.play().catch((err) => console.log('Audio playback prevented:', err));
+  audio.play().catch((err) => console.log('Audio playback blocked:', err));
 }
 
-// View Switches (Scanners do NOT auto-start upon view switch)
+// Date Format Helper (YYYY-MM-DD)
+function getTodayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Dashboard Stats Calculation
+function updateDashboardStats() {
+  const todayStr = new Date().toLocaleDateString();
+
+  const todayTransactions = savedIssuedPorridge.filter(i => i.timestamp && i.timestamp.startsWith(todayStr));
+  const todayTotalCount = todayTransactions.reduce((acc, curr) => acc + (parseInt(curr.count) || 0), 0);
+
+  document.getElementById('statTodayQuantity').textContent = todayTotalCount;
+  document.getElementById('statTodayTransactions').textContent = todayTransactions.length;
+  document.getElementById('statTotalRegistrations').textContent = savedRegistrations.length;
+  document.getElementById('statRegisteredFileCount').textContent = registeredMembers.length;
+}
+
+// Views Navigation
 function showRegistrationView() {
   document.getElementById('dashboardSection').style.display = 'none';
   document.getElementById('issuePorridgeView').style.display = 'none';
@@ -124,10 +151,11 @@ function showDashboardView() {
   document.getElementById('dashboardSection').style.display = 'flex';
   stopRegScanner();
   stopIssueScanner();
+  updateDashboardStats();
 }
 
 /* ==========================================================================
-   1. REGISTRATION MODULE SCANNERS & HANDLERS
+   1. REGISTRATION MODULE & AUTOSUGGEST
    ========================================================================== */
 
 function startRegScanner() {
@@ -141,7 +169,7 @@ function startRegScanner() {
     config,
     (decodedText) => {
       stopRegScanner();
-      processRegMemberId(decodedText.trim());
+      processRegMemberId(decodedText.trim(), true);
     }
   ).then(() => {
     isRegScannerActive = true;
@@ -176,6 +204,37 @@ function updateRegScannerBtnUI(active) {
   btn.className = active ? "btn btn-outline-warning btn-sm rounded-pill" : "btn btn-outline-primary btn-sm rounded-pill";
 }
 
+function handleRegAutosuggest(query) {
+  const dropdown = document.getElementById('regSuggestions');
+  const val = query.trim().toLowerCase();
+  if (!val) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  const matches = masterMembers.filter(m => 
+    m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val)
+  ).slice(0, 6);
+
+  if (matches.length === 0) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  dropdown.innerHTML = matches.map(m => `
+    <div class="suggestion-item" onclick="selectRegSuggestion('${escapeHtml(m.id)}')">
+      <strong>${escapeHtml(m.id)}</strong> - <small class="text-muted">${escapeHtml(m.name)}</small>
+    </div>
+  `).join('');
+  dropdown.style.display = 'block';
+}
+
+function selectRegSuggestion(id) {
+  document.getElementById('manualIdInput').value = id;
+  document.getElementById('regSuggestions').style.display = 'none';
+  handleManualSubmit();
+}
+
 function handleManualSubmit() {
   const input = document.getElementById('manualIdInput');
   const val = input.value.trim();
@@ -187,12 +246,14 @@ function handleManualSubmit() {
   stopRegScanner();
   processRegMemberId(val, wasScanning);
   input.value = '';
+  document.getElementById('regSuggestions').style.display = 'none';
 }
 
-function processRegMemberId(memberId, shouldRestartScanner = true) {
+function processRegMemberId(memberId, shouldRestartScanner = false) {
   const existingRecord = savedRegistrations.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (existingRecord) {
     playSound('scan_duplicate.mp3');
+    flashScreenBorder('warning');
     Swal.fire({
       icon: 'warning',
       title: 'Already Registered Card!',
@@ -204,22 +265,19 @@ function processRegMemberId(memberId, shouldRestartScanner = true) {
           <p><strong>Scanned At:</strong> ${existingRecord.timestamp}</p>
         </div>
       `
-    }).then(() => {
-      if (shouldRestartScanner) startRegScanner();
-    });
+    }).then(() => { if (shouldRestartScanner) startRegScanner(); });
     return;
   }
 
   const matchedMember = masterMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!matchedMember) {
     playSound('scan_warning.mp3');
+    flashScreenBorder('error');
     Swal.fire({
       icon: 'error',
       title: 'Member Not Found',
       text: `No master record found matching ID: ${memberId}`
-    }).then(() => {
-      if (shouldRestartScanner) startRegScanner();
-    });
+    }).then(() => { if (shouldRestartScanner) startRegScanner(); });
     return;
   }
 
@@ -251,14 +309,13 @@ function openMemberModal(id, name) {
 function closeMemberModal() {
   const modalEl = bootstrap.Modal.getInstance(document.getElementById('memberModal'));
   if (modalEl) modalEl.hide();
-  if (currentEditingMember && currentEditingMember.wasScanningBefore) {
-    startRegScanner();
-  }
+  if (currentEditingMember && currentEditingMember.wasScanningBefore) startRegScanner();
   currentEditingMember = null;
 }
 
 function selectFamilyCount(count) {
   playSound(`${count}.mp3`);
+  flashScreenBorder('success');
 
   const now = new Date();
   const timestampStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
@@ -282,16 +339,13 @@ function selectFamilyCount(count) {
 
   localStorage.setItem(REG_STORAGE_KEY, JSON.stringify(savedRegistrations));
   renderRegTable();
+  updateDashboardStats();
 
   const modalEl = bootstrap.Modal.getInstance(document.getElementById('memberModal'));
   if (modalEl) modalEl.hide();
 
   currentEditingMember = null;
-
-  // Only restart scanner if it was actively running prior to edit/scan
-  if (shouldRestartScanner) {
-    startRegScanner();
-  }
+  if (shouldRestartScanner) startRegScanner();
 }
 
 function renderRegTable() {
@@ -325,7 +379,6 @@ function toggleRecordViewLimit() {
 }
 
 function editRegRecord(id) {
-  // Save current camera status before stopping
   const wasScanning = isRegScannerActive;
   stopRegScanner();
 
@@ -352,6 +405,7 @@ function deleteRegRecord(id) {
       savedRegistrations = savedRegistrations.filter(r => r.id !== id);
       localStorage.setItem(REG_STORAGE_KEY, JSON.stringify(savedRegistrations));
       renderRegTable();
+      updateDashboardStats();
       Swal.fire('Deleted!', 'Record removed.', 'success');
     }
   });
@@ -360,7 +414,7 @@ function deleteRegRecord(id) {
 function confirmResetLocalStorage() {
   Swal.fire({
     title: 'Reset All Data?',
-    text: 'This action will wipe all saved member registrations stored locally!',
+    text: 'Wipe all saved member registrations stored locally?',
     icon: 'error',
     showCancelButton: true,
     confirmButtonColor: '#dc3545',
@@ -370,6 +424,7 @@ function confirmResetLocalStorage() {
       savedRegistrations = [];
       localStorage.removeItem(REG_STORAGE_KEY);
       renderRegTable();
+      updateDashboardStats();
       Swal.fire('Reset Complete', 'Registration data wiped.', 'info');
     }
   });
@@ -396,7 +451,7 @@ function exportToExcel() {
 }
 
 /* ==========================================================================
-   2. ISSUE PORRIDGE MODULE SCANNERS & HANDLERS
+   2. ISSUE PORRIDGE MODULE & DAILY DUP CHECK
    ========================================================================== */
 
 function startIssueScanner() {
@@ -410,7 +465,7 @@ function startIssueScanner() {
     config,
     (decodedText) => {
       stopIssueScanner();
-      processIssueMemberId(decodedText.trim());
+      processIssueMemberId(decodedText.trim(), true);
     }
   ).then(() => {
     isIssueScannerActive = true;
@@ -445,6 +500,37 @@ function updateIssueScannerBtnUI(active) {
   btn.className = active ? "btn btn-outline-warning btn-sm rounded-pill" : "btn btn-outline-success btn-sm rounded-pill";
 }
 
+function handleIssueAutosuggest(query) {
+  const dropdown = document.getElementById('issueSuggestions');
+  const val = query.trim().toLowerCase();
+  if (!val) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  const matches = registeredMembers.filter(m => 
+    m.id.toLowerCase().includes(val) || m.name.toLowerCase().includes(val)
+  ).slice(0, 6);
+
+  if (matches.length === 0) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  dropdown.innerHTML = matches.map(m => `
+    <div class="suggestion-item" onclick="selectIssueSuggestion('${escapeHtml(m.id)}')">
+      <strong>${escapeHtml(m.id)}</strong> - <small class="text-muted">${escapeHtml(m.name)} (Count: ${m.count})</small>
+    </div>
+  `).join('');
+  dropdown.style.display = 'block';
+}
+
+function selectIssueSuggestion(id) {
+  document.getElementById('manualIssueIdInput').value = id;
+  document.getElementById('issueSuggestions').style.display = 'none';
+  handleManualIssueSubmit();
+}
+
 function handleManualIssueSubmit() {
   const input = document.getElementById('manualIssueIdInput');
   const val = input.value.trim();
@@ -456,62 +542,68 @@ function handleManualIssueSubmit() {
   stopIssueScanner();
   processIssueMemberId(val, wasScanning);
   input.value = '';
+  document.getElementById('issueSuggestions').style.display = 'none';
 }
 
-function processIssueMemberId(memberId, shouldRestartScanner = true) {
-  // 1. Check Duplicate Issue
-  const alreadyIssued = savedIssuedPorridge.find(item => item.id.toLowerCase() === memberId.toLowerCase());
-  if (alreadyIssued) {
-    playSound('already_issued.mp3');
+function processIssueMemberId(memberId, shouldRestartScanner = false) {
+  const todayStr = new Date().toLocaleDateString();
+
+  // Daily Duplicate Check
+  const alreadyIssuedToday = savedIssuedPorridge.find(item => 
+    item.id.toLowerCase() === memberId.toLowerCase() && 
+    item.timestamp && item.timestamp.startsWith(todayStr)
+  );
+
+  if (alreadyIssuedToday) {
+    playSound('scan_duplicate.mp3');
+    flashScreenBorder('warning');
     Swal.fire({
       icon: 'warning',
-      title: 'Porridge Already Issued!',
+      title: 'Porridge Already Issued Today!',
       html: `
         <div class="text-start">
-          <p><strong>ID:</strong> ${alreadyIssued.id}</p>
-          <p><strong>Name:</strong> ${alreadyIssued.name}</p>
-          <p><strong>Porridge Count:</strong> ${alreadyIssued.count}</p>
-          <p><strong>Issued At:</strong> ${alreadyIssued.timestamp}</p>
+          <p><strong>ID:</strong> ${alreadyIssuedToday.id}</p>
+          <p><strong>Name:</strong> ${alreadyIssuedToday.name}</p>
+          <p><strong>Count:</strong> ${alreadyIssuedToday.count}</p>
+          <p><strong>Issued At:</strong> ${alreadyIssuedToday.timestamp}</p>
         </div>
       `
-    }).then(() => {
-      if (shouldRestartScanner) startIssueScanner();
-    });
+    }).then(() => { if (shouldRestartScanner) startIssueScanner(); });
     return;
   }
 
-  // 2. Fetch from registered.json
+  // Check registered.json
   const registeredMember = registeredMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!registeredMember) {
-    playSound('not_registered.mp3');
+    playSound('scan_warning.mp3');
+    flashScreenBorder('error');
     Swal.fire({
       icon: 'error',
       title: 'Not Pre-Registered',
       text: `Card ${memberId} was not found in registered.json!`
-    }).then(() => {
-      if (shouldRestartScanner) startIssueScanner();
-    });
+    }).then(() => { if (shouldRestartScanner) startIssueScanner(); });
     return;
   }
 
-  // 3. Play Sound associated with member count
+  // Success Flow
   playSound(registeredMember.count);
+  flashScreenBorder('success');
 
   const now = new Date();
   const timestampStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
 
-  // Save transaction
   savedIssuedPorridge.unshift({
     id: registeredMember.id,
     name: registeredMember.name,
     count: registeredMember.count,
-    timestamp: timestampStr
+    timestamp: timestampStr,
+    dateKey: getTodayDateString()
   });
 
   localStorage.setItem(ISSUE_STORAGE_KEY, JSON.stringify(savedIssuedPorridge));
   renderIssueTable();
+  updateDashboardStats();
 
-  // Success Alert
   Swal.fire({
     icon: 'success',
     title: 'Porridge Issued Successfully!',
@@ -522,11 +614,9 @@ function processIssueMemberId(memberId, shouldRestartScanner = true) {
         <p><strong>Count:</strong> <span class="badge bg-success fs-6">${registeredMember.count}</span></p>
       </div>
     `,
-    timer: 2500,
+    timer: 2200,
     showConfirmButton: true
-  }).then(() => {
-    if (shouldRestartScanner) startIssueScanner();
-  });
+  }).then(() => { if (shouldRestartScanner) startIssueScanner(); });
 }
 
 function renderIssueTable() {
@@ -574,6 +664,7 @@ function deleteIssueRecord(id) {
       savedIssuedPorridge = savedIssuedPorridge.filter(r => r.id !== id);
       localStorage.setItem(ISSUE_STORAGE_KEY, JSON.stringify(savedIssuedPorridge));
       renderIssueTable();
+      updateDashboardStats();
       Swal.fire('Deleted!', 'Issuance log removed.', 'success');
     }
   });
@@ -582,7 +673,7 @@ function deleteIssueRecord(id) {
 function confirmResetIssueStorage() {
   Swal.fire({
     title: 'Reset All Issuance Data?',
-    text: 'This action will wipe all saved porridge issuance logs stored locally!',
+    text: 'Wipe all saved porridge issuance logs stored locally!',
     icon: 'error',
     showCancelButton: true,
     confirmButtonColor: '#dc3545',
@@ -592,6 +683,7 @@ function confirmResetIssueStorage() {
       savedIssuedPorridge = [];
       localStorage.removeItem(ISSUE_STORAGE_KEY);
       renderIssueTable();
+      updateDashboardStats();
       Swal.fire('Reset Complete', 'Issuance data wiped.', 'info');
     }
   });
@@ -617,7 +709,61 @@ function exportIssueToExcel() {
   XLSX.writeFile(workbook, `TJM_Ramadan_Porridge_Issued_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// Escaping utility
+/* ==========================================================================
+   3. BACKUP & RESTORE MODULE (JSON)
+   ========================================================================== */
+
+function exportBackupData() {
+  const backupObject = {
+    registrations: savedRegistrations,
+    issuedPorridge: savedIssuedPorridge,
+    exportedAt: new Date().toISOString()
+  };
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObject, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", `TJM_Ramadan_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+function triggerRestoreInput() {
+  document.getElementById('restoreFileInput').click();
+}
+
+function importBackupData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const importedData = JSON.parse(e.target.result);
+      if (importedData.registrations && importedData.issuedPorridge) {
+        savedRegistrations = importedData.registrations;
+        savedIssuedPorridge = importedData.issuedPorridge;
+
+        localStorage.setItem(REG_STORAGE_KEY, JSON.stringify(savedRegistrations));
+        localStorage.setItem(ISSUE_STORAGE_KEY, JSON.stringify(savedIssuedPorridge));
+
+        renderRegTable();
+        renderIssueTable();
+        updateDashboardStats();
+
+        Swal.fire('Backup Restored', 'Data successfully restored from file!', 'success');
+      } else {
+        Swal.fire('Error', 'Invalid backup file structure.', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Failed to parse JSON backup file.', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Utility
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")

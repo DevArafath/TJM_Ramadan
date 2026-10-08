@@ -1,4 +1,9 @@
-const CACHE_NAME = 'tjm-ramadan-v3';
+const CACHE_NAME = 'tjm-ramadan-v4';
+
+const SOUND_FILES = Array.from({ length: 12 }, (_, i) => `./sounds/${i + 1}.mp3`).concat([
+  './sounds/scan_duplicate.mp3',
+  './sounds/scan_warning.mp3'
+]);
 
 const ASSETS_TO_CACHE = [
   './',
@@ -10,7 +15,8 @@ const ASSETS_TO_CACHE = [
   './images/logo.png',
   './images/icon-192.png',
   './images/icon-512.png',
-  './images/icon-maskable-512.png'
+  './images/icon-maskable-512.png',
+  ...SOUND_FILES
 ];
 
 self.addEventListener('install', (event) => {

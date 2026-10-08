@@ -21,10 +21,14 @@
       font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: #f8fafc;
       color: #1e293b;
+      transition: border-color 0.2s ease-in-out;
+      border: 8px solid transparent;
     }
-    .navbar {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    }
+    .flash-success { border-color: #22c55e !important; }
+    .flash-warning { border-color: #eab308 !important; }
+    .flash-error { border-color: #ef4444 !important; }
+
+    .navbar { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
     .action-card {
       border: none;
       border-radius: 16px;
@@ -48,19 +52,36 @@
       overflow: hidden;
       border: 2px dashed #cbd5e1;
     }
-    .qr-reader-box video {
-      object-fit: cover;
-      border-radius: 8px;
-    }
     .table-container {
       background: #ffffff;
       border-radius: 16px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
-    /* Hidden views initially */
-    #registrationView, #issuePorridgeView {
-      display: none;
+    .stat-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
     }
+    .suggestions-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 1050;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 0 0 12px 12px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .suggestion-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .suggestion-item:hover { background-color: #f8fafc; }
+    #registrationView, #issuePorridgeView { display: none; }
   </style>
 </head>
 <body>
@@ -69,18 +90,55 @@
   <nav class="navbar navbar-dark py-3 shadow-sm mb-4">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center gap-3 fw-bold" href="#">
-        <img src="images/logo.png" alt="TJM Logo" height="42" class="d-inline-block align-text-top" onerror="this.style.display='none'">
+        <img src="images/logo.png" alt="TJM Logo" height="42" onerror="this.style.display='none'">
         <span>TJM Ramadan Portal</span>
       </a>
-      <button class="btn btn-outline-light btn-sm rounded-pill" onclick="triggerPwaInstall()" id="pwaInstallBtn" style="display: none;">
-        <i class="fa-solid fa-download me-1"></i> Install App
-      </button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-light btn-sm rounded-pill" onclick="exportBackupData()" title="Backup Data">
+          <i class="fa-solid fa-download me-1"></i> Backup
+        </button>
+        <button class="btn btn-outline-light btn-sm rounded-pill" onclick="triggerRestoreInput()" title="Restore Data">
+          <i class="fa-solid fa-upload me-1"></i> Restore
+        </button>
+        <input type="file" id="restoreFileInput" accept=".json" style="display: none;" onchange="importBackupData(event)">
+        <button class="btn btn-outline-warning btn-sm rounded-pill" onclick="triggerPwaInstall()" id="pwaInstallBtn" style="display: none;">
+          <i class="fa-solid fa-app-indicator me-1"></i> Install App
+        </button>
+      </div>
     </div>
   </nav>
 
   <div class="container pb-5">
     
-    <!-- Main Dashboard Section -->
+    <!-- Dashboard Summary Statistics Bar -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center">
+          <small class="text-muted fw-bold d-block text-uppercase">Today's Porridge Issued</small>
+          <span class="fs-3 fw-bold text-teal" style="color: #0d9488;" id="statTodayQuantity">0</span>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center">
+          <small class="text-muted fw-bold d-block text-uppercase">Today's Scans</small>
+          <span class="fs-3 fw-bold text-primary" id="statTodayTransactions">0</span>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center">
+          <small class="text-muted fw-bold d-block text-uppercase">Total Registrations</small>
+          <span class="fs-3 fw-bold text-dark" id="statTotalRegistrations">0</span>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card p-3 text-center">
+          <small class="text-muted fw-bold d-block text-uppercase">Pre-Registered File</small>
+          <span class="fs-3 fw-bold text-secondary" id="statRegisteredFileCount">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Navigation Section -->
     <div id="dashboardSection" class="row g-4 mb-4">
       <div class="col-md-6">
         <div class="card action-card bg-primary text-white p-4 h-100" onclick="showRegistrationView()">
@@ -115,7 +173,6 @@
         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill fw-bold" id="totalSavedCount">0 Records Saved</span>
       </div>
 
-      <!-- Registration Scanner Section -->
       <div class="card border-0 shadow-sm rounded-4 mb-4">
         <div class="card-body p-4">
           <h5 class="fw-bold mb-3"><i class="fa-solid fa-qrcode me-2 text-primary"></i> Membership Registration</h5>
@@ -124,27 +181,27 @@
               <div id="qr-reader" class="qr-reader-box w-100"></div>
               <div class="mt-2 text-center">
                 <button id="toggleRegCameraBtn" class="btn btn-outline-primary btn-sm rounded-pill" onclick="toggleRegCamera()">
-                  <i class="fa-solid fa-video me-1"></i> Pause Scanner
+                  <i class="fa-solid fa-play me-1"></i> Start Scanner
                 </button>
               </div>
             </div>
 
-            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md">
-              <label class="form-label fw-semibold">Manual Membership ID Entry</label>
-              <div class="input-group mb-3">
+            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md position-relative">
+              <label class="form-label fw-semibold">Search / Manual ID Entry</label>
+              <div class="input-group">
                 <span class="input-group-text bg-light"><i class="fa-solid fa-id-card"></i></span>
-                <input type="text" id="manualIdInput" class="form-control" placeholder="e.g. FG/001/6/O/G">
+                <input type="text" id="manualIdInput" class="form-control" placeholder="Search ID or Name..." oninput="handleRegAutosuggest(this.value)" autocomplete="off">
                 <button class="btn btn-primary" type="button" onclick="handleManualSubmit()">
                   <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
               </div>
-              <small class="text-muted">Type the exact Membership ID if scanning fails.</small>
+              <div id="regSuggestions" class="suggestions-dropdown" style="display: none;"></div>
+              <small class="text-muted mt-2">Type ID or Member Name for live search.</small>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Registration Table -->
       <div class="table-container p-4">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
           <div>
@@ -152,18 +209,11 @@
             <small class="text-muted" id="regTableSubtitle">Displaying recent 25 records</small>
           </div>
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleRecordViewLimit()" title="Toggle Show All / Recent 25">
-              <i class="fa-solid fa-list"></i>
-            </button>
-            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportToExcel()" title="Export to Excel">
-              <i class="fa-solid fa-file-excel"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetLocalStorage()" title="Reset All Registration Data">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
+            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleRecordViewLimit()" title="Toggle View Limit"><i class="fa-solid fa-list"></i></button>
+            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportToExcel()" title="Export Excel"><i class="fa-solid fa-file-excel"></i></button>
+            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetLocalStorage()" title="Reset Registration Data"><i class="fa-solid fa-trash-can"></i></button>
           </div>
         </div>
-
         <div class="table-responsive">
           <table id="membersTable" class="table table-hover align-middle w-100">
             <thead class="table-light">
@@ -187,10 +237,9 @@
         <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="showDashboardView()">
           <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
         </button>
-        <span class="badge bg-teal text-white border px-3 py-2 rounded-pill fw-bold" style="background-color: #0d9488;" id="totalIssuedCount">0 Porridge Issued</span>
+        <span class="badge text-white border px-3 py-2 rounded-pill fw-bold" style="background-color: #0d9488;" id="totalIssuedCount">0 Porridge Issued</span>
       </div>
 
-      <!-- Issue Porridge Scanner Section -->
       <div class="card border-0 shadow-sm rounded-4 mb-4">
         <div class="card-body p-4">
           <h5 class="fw-bold mb-3" style="color: #0d9488;"><i class="fa-solid fa-bowl-rice me-2"></i> Issue Porridge Module</h5>
@@ -199,27 +248,27 @@
               <div id="qr-reader-issue" class="qr-reader-box w-100"></div>
               <div class="mt-2 text-center">
                 <button id="toggleIssueCameraBtn" class="btn btn-outline-success btn-sm rounded-pill" onclick="toggleIssueCamera()">
-                  <i class="fa-solid fa-video me-1"></i> Pause Scanner
+                  <i class="fa-solid fa-play me-1"></i> Start Scanner
                 </button>
               </div>
             </div>
 
-            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md">
-              <label class="form-label fw-semibold">Manual Card Search & Issue</label>
-              <div class="input-group mb-3">
+            <div class="col-md-5 d-flex flex-column justify-content-center border-start-md position-relative">
+              <label class="form-label fw-semibold">Search Registered Members</label>
+              <div class="input-group">
                 <span class="input-group-text bg-light"><i class="fa-solid fa-id-card"></i></span>
-                <input type="text" id="manualIssueIdInput" class="form-control" placeholder="e.g. PR/999/1/O/X">
+                <input type="text" id="manualIssueIdInput" class="form-control" placeholder="Search ID or Name..." oninput="handleIssueAutosuggest(this.value)" autocomplete="off">
                 <button class="btn btn-success" style="background-color: #0d9488; border-color: #0d9488;" type="button" onclick="handleManualIssueSubmit()">
                   <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
               </div>
-              <small class="text-muted">Checks card against pre-registered file (registered.json).</small>
+              <div id="issueSuggestions" class="suggestions-dropdown" style="display: none;"></div>
+              <small class="text-muted mt-2">Searches pre-registered `registered.json` file.</small>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Porridge Issuance Table -->
       <div class="table-container p-4">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
           <div>
@@ -227,18 +276,11 @@
             <small class="text-muted" id="issueTableSubtitle">Displaying recent 25 issued records</small>
           </div>
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleIssueRecordViewLimit()" title="Toggle Show All / Recent 25">
-              <i class="fa-solid fa-list"></i>
-            </button>
-            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportIssueToExcel()" title="Export Issuance Log to Excel">
-              <i class="fa-solid fa-file-excel"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetIssueStorage()" title="Reset All Issuance Data">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
+            <button class="btn btn-sm btn-outline-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="toggleIssueRecordViewLimit()" title="Toggle View Limit"><i class="fa-solid fa-list"></i></button>
+            <button class="btn btn-sm btn-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="exportIssueToExcel()" title="Export Excel"><i class="fa-solid fa-file-excel"></i></button>
+            <button class="btn btn-sm btn-outline-danger rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width:38px; height:38px;" onclick="confirmResetIssueStorage()" title="Reset Issuance Data"><i class="fa-solid fa-trash-can"></i></button>
           </div>
         </div>
-
         <div class="table-responsive">
           <table id="issuedTable" class="table table-hover align-middle w-100">
             <thead class="table-light">
@@ -258,7 +300,7 @@
 
   </div>
 
-  <!-- Family Count Selection Modal (Registration Mode) -->
+  <!-- Registration Modal -->
   <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg rounded-4">
@@ -287,7 +329,6 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Application Logic -->
   <script src="app.js"></script>
 </body>
 </html>

@@ -252,7 +252,7 @@ function handleManualSubmit() {
 function processRegMemberId(memberId, shouldRestartScanner = false) {
   const existingRecord = savedRegistrations.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (existingRecord) {
-    playSound('scan_duplicate.mp3');
+    playSound('already_issued.mp3');
     flashScreenBorder('warning');
     Swal.fire({
       icon: 'warning',
@@ -271,7 +271,7 @@ function processRegMemberId(memberId, shouldRestartScanner = false) {
 
   const matchedMember = masterMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!matchedMember) {
-    playSound('scan_warning.mp3');
+    playSound('not_registered.mp3');
     flashScreenBorder('error');
     Swal.fire({
       icon: 'error',
@@ -555,7 +555,7 @@ function processIssueMemberId(memberId, shouldRestartScanner = false) {
   );
 
   if (alreadyIssuedToday) {
-    playSound('scan_duplicate.mp3');
+    playSound('already_issued.mp3');
     flashScreenBorder('warning');
     Swal.fire({
       icon: 'warning',
@@ -575,7 +575,7 @@ function processIssueMemberId(memberId, shouldRestartScanner = false) {
   // Check registered.json
   const registeredMember = registeredMembers.find(item => item.id.toLowerCase() === memberId.toLowerCase());
   if (!registeredMember) {
-    playSound('scan_warning.mp3');
+    playSound('not_registered.mp3');
     flashScreenBorder('error');
     Swal.fire({
       icon: 'error',

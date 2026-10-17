@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tjm-ramadan-v4';
+const CACHE_NAME = 'tjm-ramadan-v5';
 
 const SOUND_FILES = Array.from({ length: 12 }, (_, i) => `./sounds/${i + 1}.mp3`).concat([
   './sounds/scan_duplicate.mp3',
@@ -48,7 +48,15 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).catch(() => {
+        // Fallback for offline navigation requests (when user opens the PWA offline)
+        if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+          return caches.match('./index.html');
+        }
+      });
     })
   );
 });
